@@ -7,89 +7,43 @@ on:
 jobs:
 
   build-windows:
-    
+
     runs-on: windows-2019
     if: "! contains(github.event.head_commit.message, '[skip ci]')"
 
-    steps:
-
-    - uses: actions/checkout@v2
-
-    - name: Retrieve submodules
-      shell: cmd
-      run: git submodule update --init --recursive
-      
-    - name: Build Python
-      shell: cmd
-      run: |
-        cd Scripts
-        call BuildPythonForWindows.bat --ci
-        cd ..
-        mkdir cmake-build-release
-        cd cmake-build-release
-        cmake ..
-        
-    - name: Build DearPyGui
-      shell: cmd
-      run: |
-        cmake --build cmake-build-release --config Release
-
-  build-MacOS:
-    
-    runs-on: MacOS-latest
-    if: "! contains(github.event.head_commit.message, '[skip ci]')"
+    strategy:
+      matrix:
+        python-version: [ "3.10", "3.11" ]
 
     steps:
+      - uses: actions/checkout@v2
 
-    - uses: actions/checkout@v2
+      - name: Retrieve submodules
+        shell: cmd
+        run: git submodule update --init --recursive
 
-    - name: Retrieve submodules
-      run: git submodule update --init --recursive
-    
-    - name: Build Python
-      run: |
-        cd Dependencies/cpython
-        mkdir debug
-        cd debug
-        ../configure --with-pydebug --enable-shared --prefix=$(pwd) LDFLAGS=-Wl,-rpath,$(pwd)
-        make
-        make install
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Build DearPyGui
-      run: |
-        mkdir cmake-build-debug
-        cd cmake-build-debug
-        cmake ..
-        cd ..
-        cmake --build cmake-build-debug --config Debug
+      - name: Build Python
+        shell: cmd
+        run: |
+          cd Scripts
+          call BuildPythonForWindows.bat --ci
+          cd ..
+          mkdir cmake-build-release
+          cd cmake-build-release
+          cmake ..
 
-  build-Ubuntu:
-    
-    runs-on: ubuntu-18.04
-    if: "! contains(github.event.head_commit.message, '[skip ci]')"
+      - name: Build DearPyGui
+        shell: cmd
+        run: |
+          cmake --build cmake-build-release --config Release
 
-    steps:
-
-    - uses: actions/checkout@v2
-
-    - name: Retrieve submodules
-      run: git submodule update --init --recursive
-    
-    - name: Build Python
-      run: |
-        sudo apt-get update
-        sudo apt-get install libgl1-mesa-dev
-        sudo apt-get install xorg-dev
-        cd Dependencies/cpython
-        mkdir debug
-        cd debug
-        ../configure --with-pydebug --enable-shared
-        make
-
-    - name: Build DearPyGui
-      run: |
-        mkdir cmake-build-debug
-        cd cmake-build-debug
-        cmake ..
-        cd ..
-        cmake --build cmake-build-debug --config Debug
+      - name: Upload Binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: dearpygui-binary-0.6.415-${{ matrix.python-version }}
+          path: D:/a/DearPyGui/DearPyGui/cmake-build-release/*
